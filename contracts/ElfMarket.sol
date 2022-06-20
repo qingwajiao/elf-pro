@@ -19,9 +19,12 @@ import "hardhat/console.sol";
           注意：为了防止他人购买nft时，传入与tokenid不匹配的level。所以此接口只对elf项目方的后端开放，为此需要使用多签名（需要后端账户签名 + 用户签名）
 
         其他特权功能：
-        4.提取：owner账户(市场管理员）可以调用withdraw方法，需要传入tokenIDs 、 to 两个参数，将对应的nft提取到to地址。
-        5.owner账户(市场管理员）设置 nft各个级别对应的价格
-        6.owner账户(市场管理员）设置一个财务地址，用于接收用户购买nft是发送的usdt
+        4.nfking账户（项目方）可以将自己的nft投放到ElfMarket市场中售卖
+        5.提取：owner账户(市场管理员）可以调用withdraw方法，需要传入tokenIDs 、 to 两个参数，将对应的nft提取到to地址。
+        6.owner账户(市场管理员）设置 nft各个级别对应的价格
+        7.owner账户(市场管理员）设置一个财务地址，用于接收用户购买nft是发送的usdt
+        8.owner账户(市场管理员)可以设置一个后端的账户地址 用于验证签名
+        9.nfking账户（项目方）可以将自己的nft投放到ElfMarket市场中售卖
 
         为了避免ElfMarket出现脏数据，所以用户质押的nft是先转到ElfMarket管理/售卖
 **/
@@ -60,16 +63,15 @@ contract ElfMarket is Ownable, ReentrancyGuard {
     // 
     mapping(uint256 => bool) recordMap;
 
-    // 用于查询用户拥有的nft
-    uint [] public tempUserNFTs;
-
     event Deposit(address indexed user, uint indexed tokenId);
 
     event Purchase(address indexed user, uint indexed tokenId);
 
     event Withdraw(address indexed nfKings,uint[] indexed nfts);
 
-    event SetPrice(string level, uint price);
+    event SetPrice(string indexed level, uint indexed price);
+
+    event SetBackendSigner(address indexed oldBackendSigner, address indexed newBackendSigner);
 
     modifier once(uint256 id) {
         require(!recordMap[id], "already transferred");
@@ -89,9 +91,14 @@ contract ElfMarket is Ownable, ReentrancyGuard {
     }
 
     function initialize()internal {
-        levelPrice["SR"] = 100;
-        levelPrice["R"] = 35;
-        levelPrice["N"] = 10;
+        levelPrice["SR"] = 200000000000000000000;
+        levelPrice["R"] = 60000000000000000000;
+        levelPrice["N"] = 25000000000000000000;
+
+        levelPrice["NFKSR"] = 180000000000000000000;
+        levelPrice["NFKR"] = 54000000000000000000;
+        levelPrice["NFKN"] = 22500000000000000000;
+
     }
 
     // 用户质押 
@@ -154,36 +161,6 @@ contract ElfMarket is Ownable, ReentrancyGuard {
         // 将nft从unlockset中移除
         unlockSet.remove(_tokenID);
 
-        // uint userbal = IERC20(usdtAddress).balanceOf(msg.sender);
-
-        // console.log("elfmarket>>>>>>>>>","userbal:", userbal, levelPrice[_level]);
-
-        // 转账
-        IERC20(usdtAddress).transferFrom(msg.sender, elfCFO, levelPrice[_level]);
-
-        // 给用户转对应的nft
-        IERC721Enumerable(elfNFTContractAddress).safeTransferFrom(address(this), msg.sender, _tokenID);
-
-        emit Purchase(msg.sender,_tokenID);
-    }
-
-    function purchase2(uint _tokenID, string memory _level)public nonReentrant {
-
-        require( unlockSet.contains(_tokenID), "ElfMarket: NFT non-existent ");
-        require(levelPrice[_level] != 0, "ElfMarket: level non-existent");
-        require(IERC20(usdtAddress).balanceOf(msg.sender) >= levelPrice[_level], "ElfMarket: Insufficient user balance");
-
-        //todo 后续待完善 验证后段签名   
-
-        // checkSigner(abi.encodePacked(_tokenID, _level, _id), signature);
-
-        // 将nft从unlockset中移除
-        unlockSet.remove(_tokenID);
-
-        // uint userbal = IERC20(usdtAddress).balanceOf(msg.sender);
-
-        // console.log("elfmarket>>>>>>>>>","userbal:", userbal, levelPrice[_level]);
-
         // 转账
         IERC20(usdtAddress).transferFrom(msg.sender, elfCFO, levelPrice[_level]);
 
@@ -194,7 +171,7 @@ contract ElfMarket is Ownable, ReentrancyGuard {
     }
 
     // owner提取nft 到 to 地址
-    function withdraw(uint [] memory _tokenIDs, address _to)public onlyOwner {
+    function withdrawNFT(uint [] memory _tokenIDs, address _to)public onlyOwner {
         uint len = _tokenIDs.length;
 
         if (len == 0){
@@ -234,7 +211,20 @@ contract ElfMarket is Ownable, ReentrancyGuard {
         return unlockSet.values();
     }
 
-    // owner 调整级别对应的价格
+    
+        // owner 设置后端签名地址
+    function setBackendSigner(address _backendSigner) public onlyOwner {
+        require(_backendSigner != address(0),"ElfMarket: Address cannot be zero");
+        address oldAddress = backendSigner;
+        backendSigner = _backendSigner;
+
+        emit SetBackendSigner(oldAddress,_backendSigner);
+       
+    }
+
+
+
+        // owner 调整级别对应的价格
     function setPrice(string memory _level, uint _price) public onlyOwner {
         levelPrice[_level] = _price;
 
@@ -255,19 +245,22 @@ contract ElfMarket is Ownable, ReentrancyGuard {
         }
     }
 
-    function getUserNftList(address _userAddress)public returns(uint[] memory nftList){
-        require(_userAddress != address(0),"");
+    // 获取用户拥有的nft
+    function getUserNftList(address _userAddress)public view returns(uint[] memory ){
+        require(_userAddress != address(0),"ElfMarket: Address cannot be zero");
 
         uint amount =  IERC721Enumerable(elfNFTContractAddress).balanceOf(_userAddress);
 
-        if (amount == 0) return nftList;
-        delete tempUserNFTs;
+        uint[] memory tempUserNFTs = new uint[](amount);
+        
+        if (amount == 0) return tempUserNFTs;
 
         for (uint index = 0; index < amount; index ++){
             uint tokenId = IERC721Enumerable(elfNFTContractAddress).tokenOfOwnerByIndex(_userAddress, index);
-            tempUserNFTs.push(tokenId);
+            tempUserNFTs[index] = tokenId ;
         }
-        nftList = tempUserNFTs;
+
+        return tempUserNFTs;
 
     }
 
