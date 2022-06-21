@@ -14,12 +14,12 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const ELFNFT = await hre.ethers.getContractFactory("ELFNFT");
-  const elf_NFT = await ELFNFT.deploy("https://public.nftstatic.com/static/nft/BSC/","ELF_NFT","BMBELFSPORTS");
+  const BNFT = await hre.ethers.getContractFactory("BNFT");
+  const bnft = await BNFT.deploy("0x2b83877aCE845279f59919aeb912946C8b5Abe26","https://public.nftstatic.com/static/nft/BSC/","Binance NFT Mystery Box - ELF Sports League","BMBELFSPORTS");
 
-  await elf_NFT.deployed();
+  await bnft.deployed();
 
-  console.log("elf_NFT deployed to:", elf_NFT.address);
+  console.log("bnft deployed to:", bnft.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

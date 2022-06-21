@@ -62,17 +62,24 @@
 
     相关合约测试地址：
         ELFMARKET: 0x92ba15D3f1d50E1752FA97ff8B7c88a38CCcdF92
-        BUSD : 0x63E085DA18CE355A45F70470b51B66A9F8FFF600
-        BNFT : 0xB972BA3080266a87dF52ea80f10357F9FC3343Cd  
-            tokenid:219200001353  level: Barcelona Dragons R 
+
+        BUSD : 0x63E085DA18CE355A45F70470b51B66A9F8FFF600   购买nft时 需要先调用这个合约的approve()方法，将购买的额度授权给 ELFMARKET合约，
+
+        BNFT : 0xB972BA3080266a87dF52ea80f10357F9FC3343Cd   质押nft时 需要先调用这个合约的approve()方法，将质押的nft 的tokenid授权给 ELFMARKET合约
+
+
+            tokenid:219200001353  level: Barcelona Dragons R    approve
             tokenid:219200000466  level: Hamburg Sea Devils R
             tokenid:219200001219  level: Vienna Vikings SR
             tokenid:219200000565  level: Leipzig Kings N
             tokenid:219200000092  level: Leipzig Kings N
 
+
+
         ELFMARKET合约相关的默认参数：
             elfCFO：0x2b83877aCE845279f59919aeb912946C8b5Abe26
             backendSigner：0x2b83877aCE845279f59919aeb912946C8b5Abe26
+            ELFMARKET的owner(市场管理员地址)：0x2b83877aCE845279f59919aeb912946C8b5Abe26
             busdAddress：0x63E085DA18CE355A45F70470b51B66A9F8FFF600
             elfNFTContractAddress:0xB972BA3080266a87dF52ea80f10357F9FC3343Cd
 

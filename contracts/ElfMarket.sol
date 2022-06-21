@@ -44,7 +44,7 @@ contract ElfMarket is Ownable, ReentrancyGuard {
     // elf财务账户地址 
     address public elfCFO;
     // 支付代币地址
-    address public usdtAddress;
+    address public busdAddress;
     // ELF的nft合约地址
     address public elfNFTContractAddress;
     // elf后端签名账户
@@ -80,11 +80,11 @@ contract ElfMarket is Ownable, ReentrancyGuard {
     }
 
     // 部署合约需要指定 cfo地址 支付代币地址 elf的nft的合约地址
-    constructor(address _elfCFOAddress, address _usdtAddress, address _elfNFTaddress, address _backendSigner){
-        require(_elfCFOAddress != address(0) && _usdtAddress != address(0) && _elfNFTaddress != address(0),"ElfMarket: Parameter error");
+    constructor(address _elfCFOAddress, address _busdAddress, address _elfNFTaddress, address _backendSigner){
+        require(_elfCFOAddress != address(0) && _busdAddress != address(0) && _elfNFTaddress != address(0),"ElfMarket: Parameter error");
         elfCFO = _elfCFOAddress;
         elfNFTContractAddress = _elfNFTaddress;
-        usdtAddress = _usdtAddress;
+        busdAddress = _busdAddress;
         backendSigner = _backendSigner;
         initialize();
 
@@ -98,20 +98,6 @@ contract ElfMarket is Ownable, ReentrancyGuard {
         levelPrice["NFKSR"] = 180000000000000000000;
         levelPrice["NFKR"] = 54000000000000000000;
         levelPrice["NFKN"] = 22500000000000000000;
-
-    }
-
-    // 用户质押 
-    // _tokenID：nft的tokenid
-    // _pid：质押的比赛场次             pass
-    function deposit(uint _tokenID, string memory _pid)public {
-
-        IERC721Enumerable(elfNFTContractAddress).transferFrom(msg.sender,address(this),_tokenID);
-
-        // 将该nft添加到lockset中
-        lockSet[_pid].push(_tokenID);
-
-        emit Deposit(msg.sender,_tokenID);
 
     }
 
@@ -152,7 +138,7 @@ contract ElfMarket is Ownable, ReentrancyGuard {
 
         require( unlockSet.contains(_tokenID), "ElfMarket: NFT non-existent ");
         require(levelPrice[_level] != 0, "ElfMarket: level non-existent");
-        require(IERC20(usdtAddress).balanceOf(msg.sender) >= levelPrice[_level], "ElfMarket: Insufficient user balance");
+        require(IERC20(busdAddress).balanceOf(msg.sender) >= levelPrice[_level], "ElfMarket: Insufficient user balance");
 
         //todo 后续待完善 验证后段签名   
 
@@ -162,7 +148,7 @@ contract ElfMarket is Ownable, ReentrancyGuard {
         unlockSet.remove(_tokenID);
 
         // 转账
-        IERC20(usdtAddress).transferFrom(msg.sender, elfCFO, levelPrice[_level]);
+        IERC20(busdAddress).transferFrom(msg.sender, elfCFO, levelPrice[_level]);
 
         // 给用户转对应的nft
         IERC721Enumerable(elfNFTContractAddress).safeTransferFrom(address(this), msg.sender, _tokenID);
@@ -170,12 +156,17 @@ contract ElfMarket is Ownable, ReentrancyGuard {
         emit Purchase(msg.sender,_tokenID);
     }
 
+    function withdrawERC20(address _nftAddress, address _to, uint _amount)public onlyOwner{
+        require(_to != address(0),"Address cannot be zero");
+        IERC20(_nftAddress).transfer(_to,_amount);
+    }
+
     // owner提取nft 到 to 地址
-    function withdrawNFT(uint [] memory _tokenIDs, address _to)public onlyOwner {
+    function withdrawNFT(address _nftAddress, address _to, uint[] memory _tokenIDs)public onlyOwner {
         uint len = _tokenIDs.length;
 
         if (len == 0){
-            _withdrawAll(_to);
+            _withdrawAll(_nftAddress, _to);
             return;
         }
         
@@ -183,7 +174,7 @@ contract ElfMarket is Ownable, ReentrancyGuard {
             uint tokenid = _tokenIDs[index];
             // unlock状态才能转走
 
-            IERC721Enumerable(elfNFTContractAddress).transferFrom(address(this),_to,tokenid);
+            IERC721Enumerable(_nftAddress).safeTransferFrom(address(this),_to,tokenid);
             // 需要将转移走的tokenid 从unlockset中移除，避免后端获取到脏数据
             unlockSet.remove(tokenid);
         }
@@ -192,13 +183,13 @@ contract ElfMarket is Ownable, ReentrancyGuard {
 
     }
 
-    function _withdrawAll(address _to)internal{
+    function _withdrawAll(address _nftAddress, address _to)internal{
         require(_to != address(0),"ElfMarket: Account has no permission");
         uint[]memory nftList = getUserNftList(address(this));
         uint len = nftList.length;
         for (uint index =0;index < len; index ++){
 
-            IERC721Enumerable(elfNFTContractAddress).transferFrom(address(this), _to, nftList[index]);
+            IERC721Enumerable(_nftAddress).safeTransferFrom(address(this), _to, nftList[index]);
             unlockSet.remove(nftList[index]);
         }
         emit Withdraw(_to,nftList);
@@ -262,6 +253,11 @@ contract ElfMarket is Ownable, ReentrancyGuard {
 
         return tempUserNFTs;
 
+    }
+
+
+    function onERC721Received(address _operator,address _from,uint256 _tokenId,bytes calldata _data) external returns(bytes4){
+        return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
     }
 
 

@@ -23,9 +23,29 @@ async function main() {
 
 //   await bnft.transferFrom("0x2b83877aCE845279f59919aeb912946C8b5Abe26","0x2b83877aCE845279f59919aeb912946C8b5Abe26","219200001353");
 
-  const amontaddress = await bnft.ownerOf("219200001353");
+  // const amontaddress = await bnft.ownerOf("219200001353");
 
-  console.log("219200001353 owner address :",amontaddress);
+  // console.log("219200001353 owner address :",amontaddress);
+
+  //========deployed ====erc20  ElfERC20
+
+  const ElfERC20 = await hre.ethers.getContractFactory("ElfERC20");
+  const elferc20 = await ElfERC20.deploy();
+  await elferc20.deployed();
+
+  console.log("elferc20 deployed to:", elferc20.address);
+
+
+  // ========deployed ====elfmarket====  ElfMarket  
+
+
+  const ElfMarket = await hre.ethers.getContractFactory("ElfMarket");
+  const elfmarket = await ElfMarket.deploy("0x2b83877aCE845279f59919aeb912946C8b5Abe26",elferc20.address,bnft.address,"0x2b83877aCE845279f59919aeb912946C8b5Abe26");
+  await elfmarket.deployed();
+
+  console.log("elfmarket deployed to:", elfmarket.address);
+
+
 
 
 }
@@ -38,3 +58,11 @@ main()
     console.error(error);
     process.exit(1);
   });
+
+
+
+  /** ropsten 
+   * elf_NFT deployed to: 0x26Dee35eBa7D70EeEe6f064bfd9aE0Bbc03aC144
+   * elferc20 deployed to: 0xbBE49D88d2374A1855809b1FDd0133f152362C46
+   * elfmarket deployed to: 0x47D12f8016820d56d34Fb792855426bCf919BBFe
+   */
